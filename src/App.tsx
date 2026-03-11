@@ -13,22 +13,14 @@ import {
   ArrowDown,
   ClipboardPaste,
   X,
+  ExternalLink,
 } from 'lucide-react';
 
 type VideoInfo = {
   id: string;
   title: string;
   thumbnail: string;
-  duration: string;
   channel: string;
-};
-
-type DownloadOption = {
-  quality: string;
-  format: string;
-  label: string;
-  icon: React.ReactNode;
-  type: 'video' | 'audio';
 };
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
@@ -48,13 +40,53 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
-const downloadOptions: DownloadOption[] = [
-  { quality: '1080p', format: 'mp4', label: '1080p HD', icon: <Video size={18} />, type: 'video' },
-  { quality: '720p', format: 'mp4', label: '720p HD', icon: <Video size={18} />, type: 'video' },
-  { quality: '480p', format: 'mp4', label: '480p', icon: <Video size={18} />, type: 'video' },
-  { quality: '360p', format: 'mp4', label: '360p', icon: <Video size={18} />, type: 'video' },
-  { quality: '320kbps', format: 'mp3', label: 'MP3 320kbps', icon: <Music size={18} />, type: 'audio' },
-  { quality: '128kbps', format: 'mp3', label: 'MP3 128kbps', icon: <Music size={18} />, type: 'audio' },
+type DownloadService = {
+  name: string;
+  icon: React.ReactNode;
+  description: string;
+  color: string;
+  getUrl: (videoId: string, youtubeUrl: string) => string;
+};
+
+const downloadServices: DownloadService[] = [
+  {
+    name: 'Cobalt Tools',
+    icon: <Download size={20} />,
+    description: 'En hızlı ve güvenilir — MP4 & MP3',
+    color: 'from-blue-500 to-cyan-500',
+    getUrl: (_id, url) => `https://cobalt.tools/?url=${encodeURIComponent(url)}`,
+  },
+  {
+    name: 'SaveFrom',
+    icon: <Video size={20} />,
+    description: 'Çoklu kalite seçenekleri — HD',
+    color: 'from-green-500 to-emerald-500',
+    getUrl: (_id, url) => `https://en.savefrom.net/1-${encodeURIComponent(url)}`,
+  },
+  {
+    name: 'Y2Mate',
+    icon: <Music size={20} />,
+    description: 'MP3 & MP4 hızlı indirme',
+    color: 'from-red-500 to-orange-500',
+    getUrl: (id) => `https://www.y2mate.com/youtube/${id}`,
+  },
+  {
+    name: 'SSYoutube',
+    icon: <ArrowDown size={20} />,
+    description: 'Kolay ve hızlı video indirme',
+    color: 'from-purple-500 to-pink-500',
+    getUrl: (_id, url) => {
+      const modified = url.replace('youtube.com', 'ssyoutube.com').replace('youtu.be/', 'ssyoutube.com/watch?v=');
+      return modified;
+    },
+  },
+  {
+    name: '10Downloader',
+    icon: <ExternalLink size={20} />,
+    description: 'Alternatif indirme servisi',
+    color: 'from-amber-500 to-yellow-500',
+    getUrl: (_id, url) => `https://10downloader.com/download?v=${encodeURIComponent(url)}`,
+  },
 ];
 
 export default function App() {
@@ -62,8 +94,7 @@ export default function App() {
   const [status, setStatus] = useState<Status>('idle');
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [activeTab, setActiveTab] = useState<'video' | 'audio'>('video');
-  const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null);
+  const [clickedService, setClickedService] = useState<number | null>(null);
 
   const handlePaste = useCallback(async () => {
     try {
@@ -79,7 +110,7 @@ export default function App() {
     setStatus('idle');
     setVideoInfo(null);
     setErrorMsg('');
-    setDownloadingIdx(null);
+    setClickedService(null);
   }, []);
 
   const handleAnalyze = useCallback(async () => {
@@ -99,19 +130,16 @@ export default function App() {
     setStatus('loading');
     setErrorMsg('');
     setVideoInfo(null);
-
-    // Simulate fetching video info (in a real app, this would call a backend)
-    await new Promise((r) => setTimeout(r, 1500));
+    setClickedService(null);
 
     const info: VideoInfo = {
       id: videoId,
-      title: `YouTube Video — ${videoId}`,
+      title: `YouTube Video`,
       thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-      duration: '',
       channel: '',
     };
 
-    // Try to load noembed for title
+    // Fetch video info from noembed
     try {
       const resp = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
       if (resp.ok) {
@@ -128,28 +156,15 @@ export default function App() {
   }, [url]);
 
   const handleDownload = useCallback(
-    (option: DownloadOption, idx: number) => {
+    (service: DownloadService, idx: number) => {
       if (!videoInfo) return;
-      setDownloadingIdx(idx);
+      setClickedService(idx);
 
-      // Use third-party download services
-      const videoId = videoInfo.id;
+      const youtubeUrl = `https://www.youtube.com/watch?v=${videoInfo.id}`;
+      const downloadUrl = service.getUrl(videoInfo.id, youtubeUrl);
+      window.open(downloadUrl, '_blank');
 
-      setTimeout(() => {
-        // Redirect to a working YouTube download service
-        if (option.type === 'audio') {
-          window.open(
-            `https://www.y2mate.com/youtube-mp3/${videoId}`,
-            '_blank'
-          );
-        } else {
-          window.open(
-            `https://www.y2mate.com/youtube/${videoId}`,
-            '_blank'
-          );
-        }
-        setTimeout(() => setDownloadingIdx(null), 2000);
-      }, 800);
+      setTimeout(() => setClickedService(null), 3000);
     },
     [videoInfo]
   );
@@ -366,97 +381,66 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Tab Switcher */}
-              <div className="flex items-center gap-1 bg-gray-800/50 backdrop-blur-xl rounded-xl p-1 mb-5 border border-gray-700/50">
-                <button
-                  onClick={() => setActiveTab('video')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === 'video'
-                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20'
-                      : 'text-gray-400 hover:text-gray-200'
-                  }`}
-                >
-                  <Video size={16} />
-                  Video (MP4)
-                </button>
-                <button
-                  onClick={() => setActiveTab('audio')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === 'audio'
-                      ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20'
-                      : 'text-gray-400 hover:text-gray-200'
-                  }`}
-                >
-                  <Music size={16} />
-                  Ses (MP3)
-                </button>
+              {/* Download Title */}
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-700 to-transparent" />
+                <span className="text-gray-400 text-sm font-medium px-3">İndirme Servisi Seçin</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-700 to-transparent" />
               </div>
 
-              {/* Download Options */}
-              <div className="space-y-2.5">
-                {downloadOptions
-                  .filter((opt) => opt.type === activeTab)
-                  .map((option, idx) => {
-                    const globalIdx =
-                      activeTab === 'audio'
-                        ? idx + downloadOptions.filter((o) => o.type === 'video').length
-                        : idx;
-                    const isDownloading = downloadingIdx === globalIdx;
-
-                    return (
-                      <motion.div
-                        key={option.label}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className="group relative"
+              {/* Download Services */}
+              <div className="space-y-3">
+                {downloadServices.map((service, idx) => {
+                  const isClicked = clickedService === idx;
+                  return (
+                    <motion.div
+                      key={service.name}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className="group relative"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-red-500/0 to-purple-500/0 group-hover:from-red-500/10 group-hover:to-purple-500/10 rounded-xl blur transition-all" />
+                      <div
+                        className="relative flex items-center justify-between bg-gray-800/50 backdrop-blur-xl rounded-xl border border-gray-700/50 hover:border-gray-600/50 p-4 transition-all cursor-pointer"
+                        onClick={() => handleDownload(service, idx)}
                       >
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-red-500/0 to-purple-500/0 group-hover:from-red-500/10 group-hover:to-purple-500/10 rounded-xl blur transition-all" />
-                        <div className="relative flex items-center justify-between bg-gray-800/50 backdrop-blur-xl rounded-xl border border-gray-700/50 hover:border-gray-600/50 p-4 transition-all">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                option.type === 'video'
-                                  ? 'bg-red-500/10 text-red-400'
-                                  : 'bg-purple-500/10 text-purple-400'
-                              }`}
-                            >
-                              {option.icon}
-                            </div>
-                            <div>
-                              <p className="text-white font-medium text-sm">{option.label}</p>
-                              <p className="text-gray-500 text-xs uppercase tracking-wide mt-0.5">
-                                {option.format} formatı
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleDownload(option, globalIdx)}
-                            disabled={isDownloading}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                              isDownloading
-                                ? 'bg-green-500/20 text-green-300 cursor-not-allowed'
-                                : option.type === 'video'
-                                ? 'bg-red-500/10 hover:bg-red-500/20 text-red-300 hover:text-red-200'
-                                : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200'
-                            }`}
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br ${service.color} text-white shadow-lg`}
                           >
-                            {isDownloading ? (
-                              <>
-                                <CheckCircle2 size={16} />
-                                Açılıyor...
-                              </>
-                            ) : (
-                              <>
-                                <Download size={16} />
-                                İndir
-                              </>
-                            )}
-                          </button>
+                            {service.icon}
+                          </div>
+                          <div>
+                            <p className="text-white font-semibold text-sm sm:text-base">{service.name}</p>
+                            <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
+                              {service.description}
+                            </p>
+                          </div>
                         </div>
-                      </motion.div>
-                    );
-                  })}
+                        <button
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                            isClicked
+                              ? 'bg-green-500/20 text-green-300'
+                              : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
+                          }`}
+                        >
+                          {isClicked ? (
+                            <>
+                              <CheckCircle2 size={16} />
+                              <span className="hidden sm:inline">Açıldı!</span>
+                            </>
+                          ) : (
+                            <>
+                              <ExternalLink size={16} />
+                              <span className="hidden sm:inline">Aç & İndir</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
 
               {/* Info Box */}
@@ -467,8 +451,9 @@ export default function App() {
                 className="mt-6 bg-blue-500/5 border border-blue-500/10 rounded-xl p-4"
               >
                 <p className="text-blue-300/70 text-xs leading-relaxed text-center">
-                  💡 İndirme butotuna tıkladığınızda yeni sekmede indirme sayfası açılacaktır. 
-                  İstediğiniz kaliteyi seçip videoyu indirebilirsiniz.
+                  💡 Bir indirme servisi seçin, yeni sekmede açılacaktır. Serviste istediğiniz
+                  kaliteyi (1080p, 720p, MP3 vb.) seçip videoyu indirebilirsiniz. Bir servis
+                  çalışmazsa diğerini deneyin.
                 </p>
               </motion.div>
             </motion.div>
@@ -535,7 +520,7 @@ export default function App() {
                   {[
                     { step: '1', text: 'YouTube linkini kopyala' },
                     { step: '2', text: 'Linki buraya yapıştır' },
-                    { step: '3', text: 'Kaliteyi seç ve indir' },
+                    { step: '3', text: 'Servisi seç ve indir' },
                   ].map((item, i) => (
                     <motion.div
                       key={item.step}
@@ -568,7 +553,10 @@ export default function App() {
             indirilmesi yasal sorumluluğunuzdadır.
           </p>
           <p className="text-gray-400 text-sm font-medium tracking-wide">
-            By <span className="bg-gradient-to-r from-red-400 to-purple-400 bg-clip-text text-transparent font-bold">hearsiff</span>
+            By{' '}
+            <span className="bg-gradient-to-r from-red-400 to-purple-400 bg-clip-text text-transparent font-bold">
+              hearsiff
+            </span>
           </p>
         </motion.footer>
       </div>
